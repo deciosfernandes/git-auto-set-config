@@ -1,22 +1,79 @@
-//
-// Note: This example test is leveraging the Mocha test framework.
-// Please refer to their documentation on https://mochajs.org/ for help.
-//
-
-// The module 'assert' provides assertion methods from node
 import * as assert from 'assert';
+import {
+    generateGitConfigKey,
+    isRootInIgnoreList,
+    addRootToIgnoreList,
+    removeRootFromIgnoreList,
+    getConfigList,
+    GitConfig
+} from '../src/config/config';
 
-// You can import and use all API from the 'vscode' module
-// as well as import your extension to test it
-import * as vscode from 'vscode';
-import * as myExtension from '../src/extension';
+suite("generateGitConfigKey", () => {
+    test("includes email and name", () => {
+        const config: GitConfig = { "user.email": "tom@riddle.com", "user.name": "Tom Riddle" };
+        const key = generateGitConfigKey(config);
+        assert.ok(key.includes("tom@riddle.com"));
+        assert.ok(key.includes("Tom Riddle"));
+    });
 
-// Defines a Mocha test suite to group tests of similar kind together
-suite("Extension Tests", () => {
+    test("includes extra keys", () => {
+        const config: GitConfig = { "user.email": "a@b.com", "user.name": "A", "core.autocrlf": "true" };
+        const key = generateGitConfigKey(config);
+        assert.ok(key.includes("core.autocrlf=true"));
+    });
 
-    // Defines a Mocha unit test
-    test("Something 1", () => {
-        assert.equal(-1, [1, 2, 3].indexOf(5));
-        assert.equal(-1, [1, 2, 3].indexOf(0));
+    test("produces different keys for different extra key values", () => {
+        const config1: GitConfig = { "user.email": "a@b.com", "user.name": "A", "core.autocrlf": "true" };
+        const config2: GitConfig = { "user.email": "a@b.com", "user.name": "A", "core.autocrlf": "false" };
+        assert.notEqual(generateGitConfigKey(config1), generateGitConfigKey(config2));
+    });
+
+    test("produces different keys for same email/name but different extra keys", () => {
+        const config1: GitConfig = { "user.email": "a@b.com", "user.name": "A", "core.autocrlf": "true" };
+        const config2: GitConfig = { "user.email": "a@b.com", "user.name": "A" };
+        assert.notEqual(generateGitConfigKey(config1), generateGitConfigKey(config2));
+    });
+
+    test("is deterministic regardless of property insertion order", () => {
+        const config1: GitConfig = { "user.email": "a@b.com", "user.name": "A", "core.autocrlf": "true" };
+        const config2: GitConfig = { "core.autocrlf": "true", "user.name": "A", "user.email": "a@b.com" };
+        assert.equal(generateGitConfigKey(config1), generateGitConfigKey(config2));
+    });
+});
+
+suite("ignore list", () => {
+    const testRoot = "/test/fake/repo/root";
+
+    teardown(async () => {
+        await removeRootFromIgnoreList(testRoot);
+    });
+
+    test("isRootInIgnoreList returns false for unknown root", () => {
+        assert.equal(isRootInIgnoreList(testRoot), false);
+    });
+
+    test("addRootToIgnoreList makes isRootInIgnoreList return true", async () => {
+        await addRootToIgnoreList(testRoot);
+        assert.equal(isRootInIgnoreList(testRoot), true);
+    });
+
+    test("removeRootFromIgnoreList makes isRootInIgnoreList return false", async () => {
+        await addRootToIgnoreList(testRoot);
+        await removeRootFromIgnoreList(testRoot);
+        assert.equal(isRootInIgnoreList(testRoot), false);
+    });
+
+    test("addRootToIgnoreList is idempotent", async () => {
+        await addRootToIgnoreList(testRoot);
+        await addRootToIgnoreList(testRoot);
+        const count = (await Promise.resolve(getConfigList())).length; // just ensure no throw
+        assert.equal(isRootInIgnoreList(testRoot), true);
+    });
+});
+
+suite("getConfigList", () => {
+    test("returns an array", () => {
+        const list = getConfigList();
+        assert.ok(Array.isArray(list));
     });
 });

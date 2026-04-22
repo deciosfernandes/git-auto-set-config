@@ -2,7 +2,8 @@ import { workspace } from 'vscode';
 
 export interface GitConfig {
     "user.name": string,
-    "user.email": string
+    "user.email": string,
+    [key: string]: string
 }
 
 export const CUSTOM_GIT_CONFIG: GitConfig = {
@@ -49,11 +50,11 @@ export function isRootInIgnoreList(root: string): boolean {
 }
 
 export function generateGitConfigKey(c: GitConfig) {
-    return `${c["user.email"]} ${c["user.name"]}`;
+    return Object.keys(c).sort().map(k => `${k}=${c[k]}`).join(' ');
 }
 
 export function getConfigList(): GitConfig[] {
-    return getConfig().get<GitConfig[]>(CONFIG_LIST_KEY);
+    return getConfig().get<GitConfig[]>(CONFIG_LIST_KEY, []);
 }
 
 export function updateConfigList(configList: GitConfig[]): Thenable<void> {

@@ -10,7 +10,7 @@ import * as path from 'path';
 import * as cp from 'child_process';
 import { EventEmitter, Event } from 'vscode';
 
-export function denodeify<R>(fn: Function): (...args:any[]) => Promise<R> {
+export function denodeify<R>(fn: (...args: any[]) => void): (...args:any[]) => Promise<R> {
     return (...args) => new Promise((c, e) => fn(...args, (err:any, r: R) => err ? e(err) : c(r)));
 }
 export interface IDisposable {
@@ -174,12 +174,12 @@ export interface IExecutionResult {
 export async function exec(child: cp.ChildProcess): Promise<IExecutionResult> {
     const disposables: IDisposable[] = [];
 
-    const once = (ee: NodeJS.EventEmitter, name: string, fn: Function) => {
+    const once = (ee: NodeJS.EventEmitter, name: string, fn: (...args: any[]) => void) => {
         ee.once(name, fn);
         disposables.push(toDisposable(() => ee.removeListener(name, fn)));
     };
 
-    const on = (ee: NodeJS.EventEmitter, name: string, fn: Function) => {
+    const on = (ee: NodeJS.EventEmitter, name: string, fn: (...args: any[]) => void) => {
         ee.on(name, fn);
         disposables.push(toDisposable(() => ee.removeListener(name, fn)));
     };
