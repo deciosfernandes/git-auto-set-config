@@ -6,25 +6,15 @@ export interface GitConfig {
     [key: string]: string
 }
 
-export const CUSTOM_GIT_CONFIG: GitConfig = {
-    "user.name": "custom",
-    "user.email": ""
-}
-
-export const IGNORE_CURRENT_ROOT_GIT_CONFIG: GitConfig = {
-    "user.name": "Ignore current root",
-    "user.email": ""
-}
-
 const CONFIG_LIST_KEY = 'configList';
 const IGNORE_LIST_KEY = 'ignoreRootList';
 
 export function getConfig() {
-    return workspace.getConfiguration('git-autoconfig');
+    return workspace.getConfiguration('git-auto-set-config');
 }
 
 export function getConfigQueryInterval() {
-    return getConfig().get<number>('queryInterval');
+    return getConfig().get<number>('queryInterval', 5000);
 }
 
 export function getIgnoreRootList() {
@@ -36,17 +26,15 @@ export function setIgnoreRootList(ignoreRootList: string[]): Thenable<void> {
 }
 
 export function addRootToIgnoreList(root: string): Thenable<void> {
-    return setIgnoreRootList(Array.from(new Set([...getIgnoreRootList(), root])));
+    return setIgnoreRootList([...new Set([...getIgnoreRootList(), root])]);
 }
 
 export function removeRootFromIgnoreList(root: string): Thenable<void> {
-    return setIgnoreRootList(Array.from(new Set([...getIgnoreRootList().filter((r) => {
-        return r !== root;
-    })])));
+    return setIgnoreRootList(getIgnoreRootList().filter(r => r !== root));
 }
 
 export function isRootInIgnoreList(root: string): boolean {
-    return getIgnoreRootList().indexOf(root) >= 0;
+    return getIgnoreRootList().includes(root);
 }
 
 export function generateGitConfigKey(c: GitConfig) {
