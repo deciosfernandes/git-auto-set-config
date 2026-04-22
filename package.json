@@ -61,10 +61,14 @@
                                 "type": "string",
                                 "description": "name associated with git account"
                             }
+                        },
+                        "additionalProperties": {
+                            "type": "string",
+                            "description": "additional git config key-value pair"
                         }
                     },
                     "default": [],
-                    "description": "List of local git configs in format [{'user.email': 'Marvolo@Riddle.Tom', 'user.name': 'Tom Marvolo Riddle'}]"
+                    "description": "List of local git configs in format [{'user.email': 'Marvolo@Riddle.Tom', 'user.name': 'Tom Marvolo Riddle', 'core.autocrlf': 'true'}]"
                 },
                 "git-autoconfig.ignoreRootList": {
                     "type": "array",

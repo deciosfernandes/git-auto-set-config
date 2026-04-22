@@ -2,7 +2,8 @@ import { workspace } from 'vscode';
 
 export interface GitConfig {
     "user.name": string,
-    "user.email": string
+    "user.email": string,
+    [key: string]: string
 }
 
 export const CUSTOM_GIT_CONFIG: GitConfig = {

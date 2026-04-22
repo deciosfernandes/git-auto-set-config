@@ -131,6 +131,11 @@ export async function activate(context: vscode.ExtensionContext) {
 
                 await repository.config('local', 'user.email', newConfig['user.email']);
                 await repository.config('local', 'user.name', newConfig['user.name']);
+                for (const key of Object.keys(newConfig)) {
+                    if (key !== 'user.email' && key !== 'user.name') {
+                        await repository.config('local', key, newConfig[key]);
+                    }
+                }
             } catch (e) {
                 vscode.window.showErrorMessage('Failed to set local git config.', e);
                 return false;
@@ -143,12 +148,35 @@ export async function activate(context: vscode.ExtensionContext) {
             const userEmail = await vscode.window.showInputBox({ ignoreFocusOut: true, placeHolder: 'user.email like : "Marvolo@Riddle.Tom"', prompt: 'Enter email that you use for your git account.' });
             if (!userEmail) {
                 vscode.window.showInformationMessage('user.email should not be empty');
+                return;
             }
             const userName = await vscode.window.showInputBox({ ignoreFocusOut: true, placeHolder: 'user.name like : "Tom Marvolo Riddle"', prompt: 'Enter name that you use for your git account.' });
+            if (!userName) {
+                vscode.window.showInformationMessage('user.name should not be empty');
+                return;
+            }
             const newConfig: GitConfig = {
                 "user.email": userEmail,
                 "user.name": userName
             };
+            while (true) {
+                const extraKey = await vscode.window.showInputBox({
+                    ignoreFocusOut: true,
+                    placeHolder: 'e.g. core.autocrlf, commit.gpgsign (leave empty to finish)',
+                    prompt: 'Optionally enter an additional git config key to set, or leave empty to finish.'
+                });
+                if (!extraKey) {
+                    break;
+                }
+                const extraValue = await vscode.window.showInputBox({
+                    ignoreFocusOut: true,
+                    placeHolder: `Value for ${extraKey}`,
+                    prompt: `Enter value for ${extraKey}.`
+                });
+                if (extraValue !== undefined) {
+                    newConfig[extraKey] = extraValue;
+                }
+            }
             await setGitConfig(newConfig);
         }
         if (configList.length) {
