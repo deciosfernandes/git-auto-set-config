@@ -21,11 +21,12 @@ import {
 } from './consts';
 const MESSAGE_PREFIX = "git-autoconfig: ";
 
-let timeoutId: NodeJS.Timer;
+let timeoutId: ReturnType<typeof setTimeout>;
 
 // this method is called when your extension is activated
 // extension is activated the very first time the command is executed
 export async function activate(context: vscode.ExtensionContext) {
+    clearTimeout(timeoutId);
     const gitConf = await findGit(undefined);
     const git = new Git({ gitPath: gitConf.path, version: gitConf.version });
 
@@ -44,7 +45,7 @@ export async function activate(context: vscode.ExtensionContext) {
             if (repositoryRoot) {
                 const gitConfig = await getGitConfig(repository, false);
                 if (!gitConfig) {
-                    console.log(`${MESSAGE_PREFIX}Config doesn exists.`);
+                    console.log(`${MESSAGE_PREFIX}Config doesn't exist.`);
                     await setGitConfig();
                 } else {
                     console.log(`${MESSAGE_PREFIX}Config already exists. : ${JSON.stringify(gitConfig, null, 2)}`);
@@ -52,8 +53,8 @@ export async function activate(context: vscode.ExtensionContext) {
             } else {
                 console.log(`${MESSAGE_PREFIX}Failed to get repository root.`);
             }
-        } catch (_ignorred) {
-            console.log(`${MESSAGE_PREFIX}Error while trying to checkForLocalConfig. ${JSON.stringify(_ignorred)}`);
+        } catch (_ignored) {
+            console.log(`${MESSAGE_PREFIX}Error while trying to checkForLocalConfig. ${JSON.stringify(_ignored)}`);
         } finally {
             timeoutId = setTimeout(checkForLocalConfig, getConfigQueryInterval());
         }
@@ -67,7 +68,7 @@ export async function activate(context: vscode.ExtensionContext) {
     const findRepositoryRoot = async (showError = true) => {
         let repositoryRoot: string;
         try {
-            repositoryRoot = await git.getRepositoryRoot(vscode.workspace.rootPath);
+            repositoryRoot = await git.getRepositoryRoot(vscode.workspace.workspaceFolders?.[0]?.uri.fsPath);
         } catch (e) {
             if (showError) {
                 let errorMessage = `${MESSAGE_PREFIX}Failed to get git repository root.`;
@@ -89,8 +90,26 @@ export async function activate(context: vscode.ExtensionContext) {
         try {
             const userEmail = (await repository.configGet('local', 'user.email', {})).trim();
             const userName = (await repository.configGet('local', 'user.name', {})).trim();
-            showMessages && vscode.window.showInformationMessage(`${MESSAGE_PREFIX}user.email=${userEmail} user.name=${userName}`);
             const result: GitConfig = { "user.email": userEmail, "user.name": userName };
+
+            const configList = getConfigList();
+            const matchingProfile = configList.find(c =>
+                c['user.email'] === userEmail && c['user.name'] === userName
+            );
+            if (matchingProfile) {
+                for (const key of Object.keys(matchingProfile)) {
+                    if (key !== 'user.email' && key !== 'user.name') {
+                        try {
+                            result[key] = (await repository.configGet('local', key, {})).trim();
+                        } catch {
+                            // extra key not set locally — treat config as incomplete
+                            return null;
+                        }
+                    }
+                }
+            }
+
+            showMessages && vscode.window.showInformationMessage(`${MESSAGE_PREFIX}${JSON.stringify(result)}`);
             return result;
         } catch (e) {
             showMessages && vscode.window.showWarningMessage(`${MESSAGE_PREFIX}user.email or user.name is not set locally. You can set it using command '' `);
@@ -121,7 +140,7 @@ export async function activate(context: vscode.ExtensionContext) {
         }
         const repository = new Repository(git, repositoryRoot);
         const configList = getConfigList();
-        const setGitConfig = async (newConfig: GitConfig) => {
+        const applyGitConfig = async (newConfig: GitConfig) => {
             try {
                 const newConfigKey = generateGitConfigKey(newConfig);
                 if (!configList.find((c) => generateGitConfigKey(c) === newConfigKey)) {
@@ -177,7 +196,7 @@ export async function activate(context: vscode.ExtensionContext) {
                     newConfig[extraKey] = extraValue;
                 }
             }
-            await setGitConfig(newConfig);
+            await applyGitConfig(newConfig);
         }
         if (configList.length) {
             const map: Map<string, GitConfig> = configList.concat(CUSTOM_GIT_CONFIG, IGNORE_CURRENT_ROOT_GIT_CONFIG).reduce((map, c) => {
@@ -190,7 +209,7 @@ export async function activate(context: vscode.ExtensionContext) {
             } else if (pick === generateGitConfigKey(IGNORE_CURRENT_ROOT_GIT_CONFIG)) {
                 await vscode.commands.executeCommand(COMMAND_IGNORE_ROOT);
             } else {
-                await setGitConfig(map.get(pick));
+                await applyGitConfig(map.get(pick));
             }
         } else {
             await customSetGitConfig();
