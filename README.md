@@ -5,9 +5,10 @@ Working with git repos where you can have multiple identities (like one for work
 ## Features
 
 - Prompts to set local git config when opening a project that has none configured.
-- Convenient selector of previously used configs.
+- Convenient selector of previously used configs, displayed as `Name <email>`.
 - Support for additional git config keys beyond `user.email` and `user.name` (e.g. `core.autocrlf`, `commit.gpgsign`).
 - Ability to ignore specific project roots so the extension won't prompt for them.
+- Multi-root workspace support — all folders are checked, with a folder picker in commands.
 
 ![demo](media/demo.gif)
 
@@ -29,6 +30,14 @@ Working with git repos where you can have multiple identities (like one for work
 | `git-auto-set-config.queryInterval` | How often (in ms) the extension checks whether local git config is set. | `5000` |
 
 ## Release Notes
+
+### 1.0.1
+
+- Fix: command IDs and configuration namespace corrected, restoring command palette integration and config persistence
+- Fix: pressing Escape during config input now silently cancels
+- Fix: polling no longer opens a second prompt while the user is already responding to one
+- Fix: all four commands now work correctly in multi-root workspaces
+- Improve: profile picker shows `Name <email>` labels; email field validates format inline
 
 ### 1.0.0
 
