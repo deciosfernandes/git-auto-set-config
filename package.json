@@ -2,7 +2,7 @@
     "name": "git-auto-set-config",
     "displayName": "git-auto-set-config",
     "description": "Automatically set git config settings per project for VSCode",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "publisher": "deciosfernandes",
     "license": "MIT",
     "engines": {
