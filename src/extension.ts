@@ -18,14 +18,16 @@ import {
     COMMAND_UNIGNORE_ROOT
 } from './consts';
 
-const MESSAGE_PREFIX = 'git-autoconfig: ';
+const MESSAGE_PREFIX = 'git-auto-set-config: ';
 
 type ProfileItem = vscode.QuickPickItem & { config?: GitConfig; action?: 'custom' | 'ignore' };
 
 let timeoutId: ReturnType<typeof setTimeout>;
+let active = false;
 
 export async function activate(context: vscode.ExtensionContext) {
     clearTimeout(timeoutId);
+    active = true;
 
     let git: Git;
     try {
@@ -97,7 +99,7 @@ export async function activate(context: vscode.ExtensionContext) {
         try {
             const configList = getConfigList();
             const newConfigKey = generateGitConfigKey(newConfig);
-            if (!configList.find(c => generateGitConfigKey(c) === newConfigKey)) {
+            if (!configList.some(c => generateGitConfigKey(c) === newConfigKey)) {
                 configList.push(newConfig);
                 await updateConfigList(configList);
             }
@@ -119,22 +121,27 @@ export async function activate(context: vscode.ExtensionContext) {
     const customSetGitConfig = async (): Promise<GitConfig | null> => {
         const userEmail = await vscode.window.showInputBox({
             ignoreFocusOut: true,
-            placeHolder: 'user.email like: "you@example.com"',
-            prompt: 'Enter the email for your git account.'
+            placeHolder: 'you@example.com',
+            prompt: 'Enter the email for your git account.',
+            validateInput: v => !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) ? null : 'Enter a valid email address.'
         });
+        if (userEmail === undefined) return null;
         if (!userEmail) {
             vscode.window.showInformationMessage(`${MESSAGE_PREFIX}user.email must not be empty.`);
             return null;
         }
+
         const userName = await vscode.window.showInputBox({
             ignoreFocusOut: true,
-            placeHolder: 'user.name like: "Jane Doe"',
+            placeHolder: 'Jane Doe',
             prompt: 'Enter the name for your git account.'
         });
+        if (userName === undefined) return null;
         if (!userName) {
             vscode.window.showInformationMessage(`${MESSAGE_PREFIX}user.name must not be empty.`);
             return null;
         }
+
         const newConfig: GitConfig = { 'user.email': userEmail, 'user.name': userName };
         while (true) {
             const extraKey = await vscode.window.showInputBox({
@@ -155,6 +162,16 @@ export async function activate(context: vscode.ExtensionContext) {
         return newConfig;
     };
 
+    const profileLabel = (c: GitConfig) => `${c['user.name']} <${c['user.email']}>`;
+
+    const profileDescription = (c: GitConfig): string | undefined => {
+        const extras = Object.keys(c)
+            .filter(k => k !== 'user.name' && k !== 'user.email')
+            .map(k => `${k}=${c[k]}`)
+            .join(', ');
+        return extras || undefined;
+    };
+
     const setGitConfig = async (repositoryRoot?: string) => {
         if (!repositoryRoot) {
             const fsPath = await pickWorkspaceFolder();
@@ -169,7 +186,11 @@ export async function activate(context: vscode.ExtensionContext) {
 
         if (configList.length) {
             const items: ProfileItem[] = [
-                ...configList.map(c => ({ label: generateGitConfigKey(c), config: c })),
+                ...configList.map(c => ({
+                    label: profileLabel(c),
+                    description: profileDescription(c),
+                    config: c
+                })),
                 { label: '$(pencil) Enter custom config...', action: 'custom' as const },
                 { label: '$(circle-slash) Ignore this root', action: 'ignore' as const }
             ];
@@ -192,6 +213,8 @@ export async function activate(context: vscode.ExtensionContext) {
         }
     };
 
+    let isPrompting = false;
+
     const checkForLocalConfig = async () => {
         try {
             for (const folder of vscode.workspace.workspaceFolders ?? []) {
@@ -201,7 +224,14 @@ export async function activate(context: vscode.ExtensionContext) {
                 const gitConfig = await getGitConfig(repository, false);
                 if (!gitConfig) {
                     console.log(`${MESSAGE_PREFIX}Config not set for ${repositoryRoot}.`);
-                    await setGitConfig(repositoryRoot);
+                    if (!isPrompting) {
+                        isPrompting = true;
+                        try {
+                            await setGitConfig(repositoryRoot);
+                        } finally {
+                            isPrompting = false;
+                        }
+                    }
                 } else {
                     console.log(`${MESSAGE_PREFIX}Config exists for ${repositoryRoot}: ${JSON.stringify(gitConfig)}`);
                 }
@@ -209,7 +239,9 @@ export async function activate(context: vscode.ExtensionContext) {
         } catch (e) {
             console.log(`${MESSAGE_PREFIX}Error in checkForLocalConfig: ${JSON.stringify(e)}`);
         } finally {
-            timeoutId = setTimeout(checkForLocalConfig, getConfigQueryInterval());
+            if (active) {
+                timeoutId = setTimeout(checkForLocalConfig, getConfigQueryInterval());
+            }
         }
     };
 
@@ -248,5 +280,6 @@ export async function activate(context: vscode.ExtensionContext) {
 }
 
 export function deactivate() {
+    active = false;
     clearTimeout(timeoutId);
 }
